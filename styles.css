@@ -476,12 +476,12 @@ button.primary:hover {
     font-size: 11px;
     padding: 4px 1px;
     min-height: 36px;
+    min-width: 0;
     white-space: nowrap;
   }
 
   .controls .primary,
   .transport-btn {
-    min-width: 0;
-    max-width: 60px;
+    max-width: none;
   }
 }
