@@ -468,6 +468,7 @@ button.primary:hover {
 
 @media (max-width: 500px) {
   .controls {
+    grid-template-columns: 1fr 1fr 1fr 1fr !important;
     gap: 2px;
   }
 
@@ -475,13 +476,10 @@ button.primary:hover {
     font-size: 11px;
     padding: 4px 1px;
     min-height: 36px;
+    white-space: nowrap;
   }
 
-  .controls .primary {
-    min-width: 0;
-    max-width: 70px;
-  }
-
+  .controls .primary,
   .transport-btn {
     min-width: 0;
     max-width: 60px;
