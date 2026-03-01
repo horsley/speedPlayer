@@ -15,6 +15,7 @@ const nowPlayingEl = document.getElementById("now-playing");
 const audio = document.getElementById("audio-player");
 const playPauseButton = document.getElementById("play-pause");
 const backwardButton = document.getElementById("backward");
+const backToStartButton = document.getElementById("back-to-start");
 const forwardButton = document.getElementById("forward");
 const timeEl = document.getElementById("time");
 
@@ -429,6 +430,14 @@ playPauseButton.addEventListener("click", async () => {
   }
 
   updatePlayPauseLabel();
+});
+
+backToStartButton.addEventListener("click", () => {
+  if (!audio.src) {
+    return;
+  }
+
+  audio.currentTime = 0;
 });
 
 backwardButton.addEventListener("click", () => {

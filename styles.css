@@ -332,6 +332,7 @@ button.primary:hover {
 
 .controls button {
   min-height: 44px;
+  touch-action: manipulation;
 }
 
 .controls .primary {
