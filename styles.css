@@ -447,10 +447,21 @@ button.primary:hover {
   }
 
   .controls {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 4px;
+  }
+
+  .controls button {
+    font-size: 12px;
+    padding: 4px 2px;
+    min-height: 40px;
   }
 
   .controls .primary {
+    min-width: 0;
+  }
+
+  .transport-btn {
     min-width: 0;
   }
 }
