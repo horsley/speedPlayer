@@ -465,3 +465,25 @@ button.primary:hover {
     min-width: 0;
   }
 }
+
+@media (max-width: 500px) {
+  .controls {
+    gap: 2px;
+  }
+
+  .controls button {
+    font-size: 11px;
+    padding: 4px 1px;
+    min-height: 36px;
+  }
+
+  .controls .primary {
+    min-width: 0;
+    max-width: 70px;
+  }
+
+  .transport-btn {
+    min-width: 0;
+    max-width: 60px;
+  }
+}
