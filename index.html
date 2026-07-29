@@ -77,6 +77,21 @@
           stroke-linecap="round"
         />
       </symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24">
+        <path
+          d="M3.5 6.8c0-1 .8-1.8 1.8-1.8h4.2l1.7 2h7.5c1 0 1.8.8 1.8 1.8v8.9c0 1-.8 1.8-1.8 1.8H5.3c-1 0-1.8-.8-1.8-1.8V6.8z"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="icon-list" viewBox="0 0 24 24">
+        <path d="M9 6h11M9 12h11M9 18h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        <circle cx="4.7" cy="6" r="1.2" fill="currentColor" />
+        <circle cx="4.7" cy="12" r="1.2" fill="currentColor" />
+        <circle cx="4.7" cy="18" r="1.2" fill="currentColor" />
+      </symbol>
     </svg>
 
     <main class="app">
@@ -85,6 +100,20 @@
           <div class="playlist-head">
             <h2 class="playlist-title">歌单</h2>
             <div class="playlist-tools">
+              <button
+                id="view-mode-btn"
+                class="view-mode-btn"
+                type="button"
+                aria-label="切换为目录浏览"
+                title="切换为目录浏览"
+                aria-pressed="false"
+                aria-controls="track-list"
+              >
+                <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <use href="#icon-folder"></use>
+                </svg>
+                <span id="view-mode-label">目录</span>
+              </button>
               <button
                 id="search-btn"
                 class="icon-btn"

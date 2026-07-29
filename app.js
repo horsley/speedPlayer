@@ -9,6 +9,8 @@ const searchButton = document.getElementById("search-btn");
 const searchBox = document.getElementById("search-box");
 const searchInput = document.getElementById("search-input");
 const refreshButton = document.getElementById("refresh-btn");
+const viewModeButton = document.getElementById("view-mode-btn");
+const viewModeLabel = document.getElementById("view-mode-label");
 
 const trackListEl = document.getElementById("track-list");
 const nowPlayingEl = document.getElementById("now-playing");
@@ -29,11 +31,15 @@ const state = {
   playbackRate: 1,
   isScanning: false,
   searchQuery: "",
+  viewMode: "list",
+  expandedFolders: new Set(),
+  directoryTree: null,
 };
 
 let refreshIconResetTimer = null;
 const searchIconUse = searchButton?.querySelector("use") || null;
 const refreshIconUse = refreshButton?.querySelector("use") || null;
+const viewModeIconUse = viewModeButton?.querySelector("use") || null;
 const playPauseIconUse = playPauseButton?.querySelector("use") || null;
 
 function setButtonIcon(useElement, symbolId) {
@@ -73,6 +79,70 @@ function sortTracks(input) {
     }
     return TRACK_COLLATOR.compare(left.relativePath, right.relativePath);
   });
+}
+
+function matchesTrack(track, keyword) {
+  if (!keyword) {
+    return true;
+  }
+
+  return track.name.toLowerCase().includes(keyword) || track.relativePath.toLowerCase().includes(keyword);
+}
+
+function createDirectoryNode(name, relativePath) {
+  return {
+    name,
+    relativePath,
+    folders: new Map(),
+    tracks: [],
+    trackCount: 0,
+  };
+}
+
+function buildDirectoryTree(tracks) {
+  const root = createDirectoryNode("", "");
+
+  tracks.forEach((track, index) => {
+    const segments = track.relativePath.split("/").filter(Boolean);
+    const directories = segments.slice(0, -1);
+    let node = root;
+    let folderPath = "";
+
+    node.trackCount += 1;
+
+    directories.forEach((directoryName) => {
+      folderPath = folderPath ? `${folderPath}/${directoryName}` : directoryName;
+      let child = node.folders.get(directoryName);
+
+      if (!child) {
+        child = createDirectoryNode(directoryName, folderPath);
+        node.folders.set(directoryName, child);
+      }
+
+      child.trackCount += 1;
+      node = child;
+    });
+
+    node.tracks.push({ track, index });
+  });
+
+  return root;
+}
+
+function sortDirectoryNodes(nodes) {
+  return [...nodes].sort((left, right) => TRACK_COLLATOR.compare(left.name, right.name));
+}
+
+function directoryContainsMatch(node, keyword) {
+  if (!keyword) {
+    return true;
+  }
+
+  if (node.tracks.some(({ track }) => matchesTrack(track, keyword))) {
+    return true;
+  }
+
+  return [...node.folders.values()].some((folder) => directoryContainsMatch(folder, keyword));
 }
 
 function readTrackCache() {
@@ -184,55 +254,146 @@ function updateNowPlaying() {
   nowPlayingEl.textContent = track.relativePath;
 }
 
-function renderTrackList() {
-  trackListEl.innerHTML = "";
+function renderTrackItem(track, index, { depth = 0, tree = false } = {}) {
+  const item = document.createElement("li");
+  item.className = "track-item";
+  item.dataset.index = String(index);
+  item.style.setProperty("--tree-indent", `${depth * 18}px`);
 
-  if (!state.tracks.length) {
-    return;
+  if (tree) {
+    item.classList.add("tree-track-item");
   }
 
+  if (index === state.currentTrackIndex) {
+    item.classList.add("active");
+  }
+
+  const name = document.createElement("span");
+  name.className = "track-name";
+  name.textContent = track.name;
+
+  const path = document.createElement("span");
+  path.className = "track-path";
+  path.textContent = track.relativePath;
+
+  item.append(name, path);
+  return item;
+}
+
+function renderEmptyTrackState(message) {
+  const emptyItem = document.createElement("li");
+  emptyItem.className = "track-empty";
+  emptyItem.textContent = message;
+  trackListEl.appendChild(emptyItem);
+}
+
+function renderFlatTrackList() {
   const keyword = state.searchQuery.trim().toLowerCase();
   const visibleTracks = state.tracks
     .map((track, index) => ({ track, index }))
-    .filter(({ track }) => {
-      if (!keyword) {
-        return true;
-      }
-
-      return (
-        track.name.toLowerCase().includes(keyword) ||
-        track.relativePath.toLowerCase().includes(keyword)
-      );
-    });
+    .filter(({ track }) => matchesTrack(track, keyword));
 
   if (!visibleTracks.length) {
-    const emptyItem = document.createElement("li");
-    emptyItem.className = "track-empty";
-    emptyItem.textContent = "没有匹配的歌曲";
-    trackListEl.appendChild(emptyItem);
+    renderEmptyTrackState("没有匹配的歌曲");
     return;
   }
 
   visibleTracks.forEach(({ track, index }) => {
-    const item = document.createElement("li");
-    item.className = "track-item";
-    item.dataset.index = String(index);
+    trackListEl.appendChild(renderTrackItem(track, index));
+  });
+}
 
-    if (index === state.currentTrackIndex) {
-      item.classList.add("active");
-    }
+function createFolderIcon() {
+  const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  icon.classList.add("tree-folder-icon");
+  icon.setAttribute("viewBox", "0 0 24 24");
+  icon.setAttribute("aria-hidden", "true");
+
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", "#icon-folder");
+  use.setAttributeNS(XLINK_NS, "xlink:href", "#icon-folder");
+  icon.appendChild(use);
+
+  return icon;
+}
+
+function appendDirectoryContents(node, parent, depth, keyword) {
+  const folders = sortDirectoryNodes(node.folders.values()).filter((folder) => directoryContainsMatch(folder, keyword));
+
+  folders.forEach((folder) => {
+    const folderItem = document.createElement("li");
+    folderItem.className = "tree-folder";
+
+    const expanded = keyword || state.expandedFolders.has(folder.relativePath);
+    const folderButton = document.createElement("button");
+    folderButton.className = "tree-folder-toggle";
+    folderButton.type = "button";
+    folderButton.dataset.folderPath = folder.relativePath;
+    folderButton.style.setProperty("--tree-indent", `${depth * 18}px`);
+    folderButton.setAttribute("aria-expanded", String(expanded));
+    folderButton.setAttribute(
+      "aria-label",
+      `${expanded ? "收起" : "展开"}${folder.name}，包含 ${folder.trackCount} 首歌曲`,
+    );
+
+    const caret = document.createElement("span");
+    caret.className = "tree-caret";
+    caret.setAttribute("aria-hidden", "true");
+    caret.textContent = "›";
 
     const name = document.createElement("span");
-    name.className = "track-name";
-    name.textContent = track.name;
+    name.className = "tree-folder-name";
+    name.textContent = folder.name;
 
-    const path = document.createElement("span");
-    path.className = "track-path";
-    path.textContent = track.relativePath;
+    const count = document.createElement("span");
+    count.className = "tree-folder-count";
+    count.textContent = `${folder.trackCount} 首`;
 
-    item.append(name, path);
-    trackListEl.appendChild(item);
+    folderButton.append(caret, createFolderIcon(), name, count);
+    folderItem.appendChild(folderButton);
+
+    if (expanded) {
+      const children = document.createElement("ul");
+      children.className = "tree-children";
+      appendDirectoryContents(folder, children, depth + 1, keyword);
+      folderItem.appendChild(children);
+    }
+
+    parent.appendChild(folderItem);
   });
+
+  const tracks = node.tracks.filter(({ track }) => matchesTrack(track, keyword));
+  tracks.forEach(({ track, index }) => {
+    parent.appendChild(renderTrackItem(track, index, { depth, tree: true }));
+  });
+}
+
+function renderDirectoryTree() {
+  const root = state.directoryTree;
+  const keyword = state.searchQuery.trim().toLowerCase();
+
+  if (!root || !directoryContainsMatch(root, keyword)) {
+    renderEmptyTrackState("没有匹配的歌曲");
+    return;
+  }
+
+  appendDirectoryContents(root, trackListEl, 0, keyword);
+}
+
+function renderTrackList() {
+  trackListEl.innerHTML = "";
+
+  if (!state.tracks.length) {
+    renderEmptyTrackState("暂无歌曲，点刷新列表后重试");
+    return;
+  }
+
+  if (state.viewMode === "directory") {
+    renderDirectoryTree();
+    return;
+  }
+
+  renderFlatTrackList();
 }
 
 function applyPlaybackRate(rate) {
@@ -266,6 +427,7 @@ function applyTrackList(tracks, { preserveCurrent = false } = {}) {
   const currentPath = preserveCurrent ? state.tracks[state.currentTrackIndex]?.relativePath || "" : "";
 
   state.tracks = normalized;
+  state.directoryTree = buildDirectoryTree(normalized);
 
   let keepCurrent = false;
   if (currentPath) {
@@ -287,6 +449,23 @@ function applyTrackList(tracks, { preserveCurrent = false } = {}) {
   updateNowPlaying();
   updatePlayPauseLabel();
   updateTimeDisplay();
+}
+
+function setViewMode(mode) {
+  const nextMode = mode === "directory" ? "directory" : "list";
+  state.viewMode = nextMode;
+
+  const isDirectoryMode = nextMode === "directory";
+  viewModeButton?.classList.toggle("is-active", isDirectoryMode);
+  viewModeButton?.setAttribute("aria-pressed", String(isDirectoryMode));
+  viewModeButton?.setAttribute("aria-label", isDirectoryMode ? "切换为列表浏览" : "切换为目录浏览");
+  viewModeButton?.setAttribute("title", isDirectoryMode ? "切换为列表浏览" : "切换为目录浏览");
+  if (viewModeLabel) {
+    viewModeLabel.textContent = isDirectoryMode ? "列表" : "目录";
+  }
+  setButtonIcon(viewModeIconUse, isDirectoryMode ? "icon-list" : "icon-folder");
+
+  renderTrackList();
 }
 
 function setSearchOpen(open) {
@@ -381,6 +560,10 @@ searchButton?.addEventListener("click", () => {
   setSearchOpen(!expanded);
 });
 
+viewModeButton?.addEventListener("click", () => {
+  setViewMode(state.viewMode === "directory" ? "list" : "directory");
+});
+
 searchInput?.addEventListener("input", () => {
   state.searchQuery = searchInput.value.trim();
   renderTrackList();
@@ -393,6 +576,23 @@ searchInput?.addEventListener("keydown", (event) => {
 });
 
 trackListEl.addEventListener("click", async (event) => {
+  const folderButton = event.target.closest(".tree-folder-toggle");
+  if (folderButton) {
+    const folderPath = folderButton.dataset.folderPath;
+    if (!folderPath) {
+      return;
+    }
+
+    if (state.expandedFolders.has(folderPath)) {
+      state.expandedFolders.delete(folderPath);
+    } else {
+      state.expandedFolders.add(folderPath);
+    }
+
+    renderTrackList();
+    return;
+  }
+
   const item = event.target.closest(".track-item");
   if (!item) {
     return;
