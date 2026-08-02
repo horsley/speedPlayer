@@ -24,11 +24,13 @@ const timeEl = document.getElementById("time");
 const presetSpeedsEl = document.getElementById("preset-speeds");
 const speedSlider = document.getElementById("speed-slider");
 const speedLabel = document.getElementById("speed-label");
+const preservePitchToggle = document.getElementById("preserve-pitch");
 
 const state = {
   tracks: [],
   currentTrackIndex: -1,
   playbackRate: 1,
+  preservesPitch: true,
   isScanning: false,
   searchQuery: "",
   viewMode: "list",
@@ -400,13 +402,7 @@ function applyPlaybackRate(rate) {
   const clamped = Math.min(1.5, Math.max(0.5, rate));
   state.playbackRate = clamped;
   audio.playbackRate = clamped;
-
-  if ("preservesPitch" in audio) {
-    audio.preservesPitch = true;
-  }
-  if ("webkitPreservesPitch" in audio) {
-    audio.webkitPreservesPitch = true;
-  }
+  applyPitchPreservation(state.preservesPitch);
 
   const percent = Math.round(clamped * 100);
   speedSlider.value = String(percent);
@@ -416,6 +412,22 @@ function applyPlaybackRate(rate) {
   presetButtons.forEach((button) => {
     button.classList.toggle("active", Number(button.dataset.percent) === percent);
   });
+}
+
+function applyPitchPreservation(preservePitch) {
+  const enabled = Boolean(preservePitch);
+  state.preservesPitch = enabled;
+
+  if ("preservesPitch" in audio) {
+    audio.preservesPitch = enabled;
+  }
+  if ("webkitPreservesPitch" in audio) {
+    audio.webkitPreservesPitch = enabled;
+  }
+
+  if (preservePitchToggle) {
+    preservePitchToggle.checked = enabled;
+  }
 }
 
 function streamUrlForTrack(track) {
@@ -509,6 +521,7 @@ async function loadTrack(index, autoplay = true) {
   state.currentTrackIndex = index;
   audio.src = streamUrlForTrack(track);
   audio.playbackRate = state.playbackRate;
+  applyPitchPreservation(state.preservesPitch);
   renderTrackList();
   updateNowPlaying();
 
@@ -683,6 +696,10 @@ speedSlider.addEventListener("input", () => {
   applyPlaybackRate(percent / 100);
 });
 
+preservePitchToggle?.addEventListener("change", () => {
+  applyPitchPreservation(preservePitchToggle.checked);
+});
+
 audio.addEventListener("loadedmetadata", updateTimeDisplay);
 audio.addEventListener("timeupdate", updateTimeDisplay);
 audio.addEventListener("play", updatePlayPauseLabel);
@@ -693,6 +710,7 @@ audio.addEventListener("error", () => {
 });
 
 setRefreshButtonState("idle");
+applyPitchPreservation(state.preservesPitch);
 applyPlaybackRate(1);
 renderTrackList();
 updateNowPlaying();
