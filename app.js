@@ -19,6 +19,7 @@ const playPauseButton = document.getElementById("play-pause");
 const backwardButton = document.getElementById("backward");
 const backToStartButton = document.getElementById("back-to-start");
 const forwardButton = document.getElementById("forward");
+const progressSlider = document.getElementById("progress-slider");
 const timeEl = document.getElementById("time");
 
 const presetSpeedsEl = document.getElementById("preset-speeds");
@@ -244,6 +245,18 @@ function updatePlayPauseLabel() {
 
 function updateTimeDisplay() {
   timeEl.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`;
+}
+
+function updateProgress() {
+  const duration = audio.duration;
+  const hasDuration = Number.isFinite(duration) && duration > 0;
+  const currentTime =
+    hasDuration && Number.isFinite(audio.currentTime) ? Math.min(Math.max(audio.currentTime, 0), duration) : 0;
+
+  progressSlider.disabled = !hasDuration;
+  progressSlider.max = String(hasDuration ? duration : 0);
+  progressSlider.value = String(currentTime);
+  progressSlider.setAttribute("aria-valuetext", `${formatTime(currentTime)} / ${formatTime(duration)}`);
 }
 
 function updateNowPlaying() {
@@ -700,8 +713,31 @@ preservePitchToggle?.addEventListener("change", () => {
   applyPitchPreservation(preservePitchToggle.checked);
 });
 
-audio.addEventListener("loadedmetadata", updateTimeDisplay);
-audio.addEventListener("timeupdate", updateTimeDisplay);
+progressSlider.addEventListener("input", () => {
+  const nextTime = Number(progressSlider.value);
+  if (!Number.isFinite(nextTime) || !Number.isFinite(audio.duration)) {
+    return;
+  }
+
+  audio.currentTime = Math.min(Math.max(nextTime, 0), audio.duration);
+  updateTimeDisplay();
+  updateProgress();
+});
+
+audio.addEventListener("loadedmetadata", () => {
+  updateTimeDisplay();
+  updateProgress();
+});
+audio.addEventListener("durationchange", updateProgress);
+audio.addEventListener("timeupdate", () => {
+  updateTimeDisplay();
+  updateProgress();
+});
+audio.addEventListener("seeked", () => {
+  updateTimeDisplay();
+  updateProgress();
+});
+audio.addEventListener("emptied", updateProgress);
 audio.addEventListener("play", updatePlayPauseLabel);
 audio.addEventListener("pause", updatePlayPauseLabel);
 audio.addEventListener("ended", updatePlayPauseLabel);
@@ -715,6 +751,7 @@ applyPlaybackRate(1);
 renderTrackList();
 updateNowPlaying();
 updateTimeDisplay();
+updateProgress();
 updatePlayPauseLabel();
 
 if (!restoreTrackListFromCache()) {
